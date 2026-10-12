@@ -5,16 +5,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Book
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -25,6 +25,7 @@ import androidx.navigation.compose.*
 import coil.compose.SubcomposeAsyncImage
 import com.example.libraryrental.data.*
 import com.example.libraryrental.domain.LibraryViewModel
+import com.example.libraryrental.domain.SortOption
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,20 +43,36 @@ private fun LibraryApp(vm: LibraryViewModel = viewModel()) {
     val navController = rememberNavController()
     val snackbar = remember { SnackbarHostState() }
     val message by vm.message.collectAsState(initial = "")
+    val isDark by vm.isDarkTheme.collectAsStateWithLifecycle()
+
     LaunchedEffect(message) { if (message.isNotBlank()) snackbar.showSnackbar(message) }
 
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = androidx.compose.ui.graphics.Color(0xFF245B4A),
-            secondary = androidx.compose.ui.graphics.Color(0xFFB56B36),
-            surface = androidx.compose.ui.graphics.Color(0xFFFFFBF5)
-        )
-    ) {
+    val lightColors = lightColorScheme(
+        primary = Color(0xFF245B4A),
+        secondary = Color(0xFFB56B36),
+        surface = Color(0xFFFFFBF5)
+    )
+
+    val darkColors = darkColorScheme(
+        primary = Color(0xFF80D4B7),
+        secondary = Color(0xFFF2B07E),
+        surface = Color(0xFF1E2522)
+    )
+
+    MaterialTheme(colorScheme = if (isDark) darkColors else lightColors) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbar) },
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("Campus Library", fontWeight = FontWeight.Bold) }
+                    title = { Text("Campus Library", fontWeight = FontWeight.Bold) },
+                    actions = {
+                        IconButton(onClick = vm::toggleTheme) {
+                            Icon(
+                                if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                contentDescription = "Toggle Theme"
+                            )
+                        }
+                    }
                 )
             },
             bottomBar = {
@@ -91,35 +108,92 @@ private fun LibraryApp(vm: LibraryViewModel = viewModel()) {
 private fun CatalogScreen(vm: LibraryViewModel) {
     val books by vm.books.collectAsStateWithLifecycle()
     val query by vm.searchQuery.collectAsStateWithLifecycle()
-    var selected by remember { mutableStateOf<BookEntity?>(null) }
+    val categories by vm.categories.collectAsStateWithLifecycle()
+    val selectedCategory by vm.selectedCategory.collectAsStateWithLifecycle()
+    val currentSort by vm.sortOption.collectAsStateWithLifecycle()
+
+    var selectedBook by remember { mutableStateOf<BookEntity?>(null) }
     var userName by remember { mutableStateOf("") }
     var duration by remember { mutableIntStateOf(14) }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        Text("Find your next read", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-        Text("Browse the collection and reserve a book.", style = MaterialTheme.typography.bodyMedium)
-        OutlinedTextField(
-            value = query,
-            onValueChange = vm::updateSearch,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            label = { Text("Search title or author") },
-            singleLine = true
+        Text(
+            "Find your next read",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
         )
+        Text("Browse the collection and reserve a book.", style = MaterialTheme.typography.bodyMedium)
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = vm::updateSearch,
+                modifier = Modifier.weight(1f),
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                label = { Text("Search title or author") },
+                singleLine = true
+            )
+
+            Box {
+                IconButton(onClick = { sortMenuExpanded = true }) {
+                    Icon(Icons.Default.FilterList, contentDescription = "Sort books")
+                }
+                DropdownMenu(
+                    expanded = sortMenuExpanded,
+                    onDismissRequest = { sortMenuExpanded = false }
+                ) {
+                    SortOption.entries.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.label) },
+                            onClick = {
+                                vm.selectSortOption(option)
+                                sortMenuExpanded = false
+                            },
+                            leadingIcon = if (currentSort == option) {
+                                { Icon(Icons.Default.Check, contentDescription = null) }
+                            } else null
+                        )
+                    }
+                }
+            }
+        }
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 10.dp)
+        ) {
+            items(categories) { category ->
+                FilterChip(
+                    selected = selectedCategory == category,
+                    onClick = { vm.selectCategory(category) },
+                    label = { Text(category) }
+                )
+            }
+        }
+
         Text("${books.size} books", style = MaterialTheme.typography.labelLarge)
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 10.dp)) {
+
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(vertical = 10.dp)
+        ) {
             items(books, key = { it.bookId }) { book ->
                 BookCard(book = book, action = {
-                    if (book.isAvailable) selected = book
+                    if (book.isAvailable) selectedBook = book
                 })
             }
         }
     }
 
-    selected?.let { book ->
+    selectedBook?.let { book ->
         AlertDialog(
-            onDismissRequest = { selected = null },
+            onDismissRequest = { selectedBook = null },
             title = { Text("Reserve book") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -143,12 +217,15 @@ private fun CatalogScreen(vm: LibraryViewModel) {
                 }
             },
             confirmButton = {
-                Button(onClick = {
-                    vm.reserve(book, userName, duration)
-                    selected = null
-                }, enabled = userName.isNotBlank()) { Text("Reserve") }
+                Button(
+                    onClick = {
+                        vm.reserve(book, userName, duration)
+                        selectedBook = null
+                    },
+                    enabled = userName.isNotBlank()
+                ) { Text("Reserve") }
             },
-            dismissButton = { TextButton(onClick = { selected = null }) { Text("Not now") } }
+            dismissButton = { TextButton(onClick = { selectedBook = null }) { Text("Not now") } }
         )
     }
 }
@@ -224,7 +301,7 @@ private fun BookCard(book: BookEntity, action: () -> Unit) {
 
 @Composable
 private fun StatusBadge(available: Boolean) {
-    val color = if (available) androidx.compose.ui.graphics.Color(0xFF24734B) else androidx.compose.ui.graphics.Color(0xFFB74735)
+    val color = if (available) Color(0xFF24734B) else Color(0xFFB74735)
     Surface(color = color.copy(alpha = 0.12f), shape = RoundedCornerShape(50)) {
         Text(
             if (available) "Available" else "Borrowed",
@@ -238,46 +315,99 @@ private fun StatusBadge(available: Boolean) {
 @Composable
 private fun ReservationsScreen(vm: LibraryViewModel) {
     val bookings by vm.bookings.collectAsStateWithLifecycle()
+    val pastBookings by vm.pastBookings.collectAsStateWithLifecycle()
+    var selectedTab by remember { mutableIntStateOf(0) }
+
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        Text("My rentals", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
-        Text("Keep track of current books and return dates.")
-        if (bookings.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Bookmark, contentDescription = null, modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.height(8.dp))
-                    Text("No active rentals yet", style = MaterialTheme.typography.titleMedium)
-                    Text("Reserve a book from the catalog to see it here.")
+        Text(
+            "My rentals",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 12.dp, bottom = 4.dp)
+        )
+        Text("Keep track of current books and rental history.")
+
+        TabRow(selectedTabIndex = selectedTab, modifier = Modifier.padding(vertical = 8.dp)) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Active (${bookings.size})") }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("History (${pastBookings.size})") }
+            )
+        }
+
+        if (selectedTab == 0) {
+            if (bookings.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.Bookmark, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.height(8.dp))
+                        Text("No active rentals yet", style = MaterialTheme.typography.titleMedium)
+                        Text("Reserve a book from the catalog to see it here.")
+                    }
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
+                    items(bookings, key = { it.booking.bookingId }) { item ->
+                        val booking = item.booking
+                        val dateFormat = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
+                        val remaining = ((booking.returnDeadline - System.currentTimeMillis()) / (24L * 60 * 60 * 1000)).toInt()
+                        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                            Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                BookCoverImage(coverImage = item.book.coverImage, title = item.book.title)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                    Text(item.book.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    Text("By ${item.book.author} • ${item.book.category}", style = MaterialTheme.typography.bodyMedium)
+                                    Text("Reserved: ${dateFormat.format(Date(booking.bookingDate))}")
+                                    Text("Return by: ${dateFormat.format(Date(booking.returnDeadline))}")
+                                    Text(
+                                        when {
+                                            remaining < 0 -> "Overdue by ${-remaining} day(s)"
+                                            remaining == 0 -> "Due today"
+                                            else -> "$remaining day(s) remaining"
+                                        },
+                                        color = if (remaining <= 2) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(onClick = { vm.renew(booking.bookingId) }) { Text("+7 days") }
+                                        Button(onClick = { vm.returnBook(booking.bookingId) }) { Text("Return") }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
-                items(bookings, key = { it.booking.bookingId }) { item ->
-                    val booking = item.booking
-                    val dateFormat = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
-                    val remaining = ((booking.returnDeadline - System.currentTimeMillis()) / (24L * 60 * 60 * 1000)).toInt()
-                    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
-                        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            BookCoverImage(coverImage = item.book.coverImage, title = item.book.title)
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                                Text(item.book.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                Text("By ${item.book.author} • ${item.book.category}", style = MaterialTheme.typography.bodyMedium)
-                                Text("Reserved: ${dateFormat.format(Date(booking.bookingDate))}")
-                                Text("Return by: ${dateFormat.format(Date(booking.returnDeadline))}")
-                                Text(
-                                    when {
-                                        remaining < 0 -> "Overdue by ${-remaining} day(s)"
-                                        remaining == 0 -> "Due today"
-                                        else -> "$remaining day(s) remaining"
-                                    },
-                                    color = if (remaining <= 2) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = { vm.renew(booking.bookingId) }) { Text("+7 days") }
-                                    Button(onClick = { vm.returnBook(booking.bookingId) }) { Text("Return") }
+            if (pastBookings.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.secondary)
+                        Spacer(Modifier.height(8.dp))
+                        Text("No rental history yet", style = MaterialTheme.typography.titleMedium)
+                        Text("Returned books will be recorded here.")
+                    }
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 12.dp)) {
+                    items(pastBookings, key = { it.booking.bookingId }) { item ->
+                        val booking = item.booking
+                        val dateFormat = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
+                        Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
+                            Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                BookCoverImage(coverImage = item.book.coverImage, title = item.book.title)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(item.book.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    Text("By ${item.book.author}", style = MaterialTheme.typography.bodyMedium)
+                                    Text("Rented: ${dateFormat.format(Date(booking.bookingDate))}", style = MaterialTheme.typography.labelMedium)
+                                    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(50)) {
+                                        Text("Returned", modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), style = MaterialTheme.typography.labelSmall)
+                                    }
                                 }
                             }
                         }
