@@ -79,6 +79,10 @@ interface BookingDao {
     @Query("SELECT * FROM bookings WHERE status IN ('PENDING', 'ACTIVE') ORDER BY returnDeadline")
     fun observeCurrentBookings(): Flow<List<BookingWithBook>>
 
+    @Transaction
+    @Query("SELECT * FROM bookings WHERE status = 'RETURNED' ORDER BY bookingDate DESC")
+    fun observePastBookings(): Flow<List<BookingWithBook>>
+
     @Insert
     suspend fun insert(booking: BookingEntity): Long
 

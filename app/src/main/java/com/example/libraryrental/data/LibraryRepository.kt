@@ -12,6 +12,8 @@ class LibraryRepository(private val database: LibraryDatabase) {
 
     fun observeBookings(): Flow<List<BookingWithBook>> = bookings.observeCurrentBookings()
 
+    fun observePastBookings(): Flow<List<BookingWithBook>> = bookings.observePastBookings()
+
     suspend fun seedIfEmpty() {
         if (books.allBooksOnce().isEmpty()) {
             books.insertAll(
