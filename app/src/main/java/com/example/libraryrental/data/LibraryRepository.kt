@@ -16,14 +16,14 @@ class LibraryRepository(private val database: LibraryDatabase) {
         if (books.allBooksOnce().isEmpty()) {
             books.insertAll(
                 listOf(
-                    BookEntity(title = "Clean Code", author = "Robert C. Martin", category = "Software"),
-                    BookEntity(title = "The Pragmatic Programmer", author = "Andrew Hunt", category = "Software"),
-                    BookEntity(title = "Introduction to Algorithms", author = "Thomas H. Cormen", category = "Computer Science"),
-                    BookEntity(title = "Atomic Habits", author = "James Clear", category = "Personal Development"),
-                    BookEntity(title = "To Kill a Mockingbird", author = "Harper Lee", category = "Fiction"),
-                    BookEntity(title = "Database System Concepts", author = "Abraham Silberschatz", category = "Database"),
-                    BookEntity(title = "Kotlin in Action", author = "Dmitry Jemerov", category = "Programming"),
-                    BookEntity(title = "The Great Gatsby", author = "F. Scott Fitzgerald", category = "Fiction")
+                    BookEntity(title = "Clean Code", author = "Robert C. Martin", category = "Software", coverImage = "clean_code"),
+                    BookEntity(title = "The Pragmatic Programmer", author = "Andrew Hunt", category = "Software", coverImage = "pragmatic_programmer"),
+                    BookEntity(title = "Introduction to Algorithms", author = "Thomas H. Cormen", category = "Computer Science", coverImage = "intro_algorithms"),
+                    BookEntity(title = "Atomic Habits", author = "James Clear", category = "Personal Development", coverImage = "atomic_habits"),
+                    BookEntity(title = "To Kill a Mockingbird", author = "Harper Lee", category = "Fiction", coverImage = "mockingbird"),
+                    BookEntity(title = "Database System Concepts", author = "Abraham Silberschatz", category = "Database", coverImage = "database_system"),
+                    BookEntity(title = "Kotlin in Action", author = "Dmitry Jemerov", category = "Programming", coverImage = "kotlin_in_action"),
+                    BookEntity(title = "The Great Gatsby", author = "F. Scott Fitzgerald", category = "Fiction", coverImage = "great_gatsby")
                 )
             )
         }

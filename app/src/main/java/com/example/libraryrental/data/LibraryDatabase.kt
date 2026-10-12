@@ -12,7 +12,8 @@ data class BookEntity(
     val title: String,
     val author: String,
     val category: String,
-    val isAvailable: Boolean = true
+    val isAvailable: Boolean = true,
+    val coverImage: String? = null
 )
 
 @Entity(
@@ -94,7 +95,7 @@ interface BookingDao {
     suspend fun getById(bookingId: Long): BookingEntity?
 }
 
-@Database(entities = [BookEntity::class, BookingEntity::class], version = 1, exportSchema = false)
+@Database(entities = [BookEntity::class, BookingEntity::class], version = 2, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class LibraryDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
@@ -109,7 +110,7 @@ abstract class LibraryDatabase : RoomDatabase() {
                     context.applicationContext,
                     LibraryDatabase::class.java,
                     "campus_library.db"
-                ).build().also { INSTANCE = it }
+                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
             }
     }
 }

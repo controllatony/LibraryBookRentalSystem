@@ -15,11 +15,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.*
+import coil.compose.SubcomposeAsyncImage
 import com.example.libraryrental.data.*
 import com.example.libraryrental.domain.LibraryViewModel
 import java.text.SimpleDateFormat
@@ -151,6 +154,51 @@ private fun CatalogScreen(vm: LibraryViewModel) {
 }
 
 @Composable
+private fun BookCoverImage(coverImage: String?, title: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val model = remember(coverImage) {
+        val img = coverImage?.trim()
+        when {
+            img.isNullOrEmpty() -> null
+            img.startsWith("http://") || img.startsWith("https://") -> img
+            else -> {
+                val resId = context.resources.getIdentifier(img, "drawable", context.packageName)
+                if (resId != 0) resId else null
+            }
+        }
+    }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = modifier.size(54.dp, 72.dp)
+    ) {
+        if (model != null) {
+            SubcomposeAsyncImage(
+                model = model,
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                loading = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    }
+                },
+                error = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Book, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            )
+        } else {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Book, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+}
+
+@Composable
 private fun BookCard(book: BookEntity, action: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -159,15 +207,7 @@ private fun BookCard(book: BookEntity, action: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(54.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Book, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                }
-            }
+            BookCoverImage(coverImage = book.coverImage, title = book.title)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(book.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(book.author, style = MaterialTheme.typography.bodyMedium)
@@ -219,23 +259,26 @@ private fun ReservationsScreen(vm: LibraryViewModel) {
                     val dateFormat = remember { SimpleDateFormat("dd MMM yyyy", Locale.getDefault()) }
                     val remaining = ((booking.returnDeadline - System.currentTimeMillis()) / (24L * 60 * 60 * 1000)).toInt()
                     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp)) {
-                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                            Text(item.book.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text("By ${item.book.author} • ${item.book.category}", style = MaterialTheme.typography.bodyMedium)
-                            Text("Reserved: ${dateFormat.format(Date(booking.bookingDate))}")
-                            Text("Return by: ${dateFormat.format(Date(booking.returnDeadline))}")
-                            Text(
-                                when {
-                                    remaining < 0 -> "Overdue by ${-remaining} day(s)"
-                                    remaining == 0 -> "Due today"
-                                    else -> "$remaining day(s) remaining"
-                                },
-                                color = if (remaining <= 2) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { vm.renew(booking.bookingId) }) { Text("+7 days") }
-                                Button(onClick = { vm.returnBook(booking.bookingId) }) { Text("Return") }
+                        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            BookCoverImage(coverImage = item.book.coverImage, title = item.book.title)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                                Text(item.book.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text("By ${item.book.author} • ${item.book.category}", style = MaterialTheme.typography.bodyMedium)
+                                Text("Reserved: ${dateFormat.format(Date(booking.bookingDate))}")
+                                Text("Return by: ${dateFormat.format(Date(booking.returnDeadline))}")
+                                Text(
+                                    when {
+                                        remaining < 0 -> "Overdue by ${-remaining} day(s)"
+                                        remaining == 0 -> "Due today"
+                                        else -> "$remaining day(s) remaining"
+                                    },
+                                    color = if (remaining <= 2) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(onClick = { vm.renew(booking.bookingId) }) { Text("+7 days") }
+                                    Button(onClick = { vm.returnBook(booking.bookingId) }) { Text("Return") }
+                                }
                             }
                         }
                     }
